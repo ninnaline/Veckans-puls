@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Veckans puls</title>
+<style>
+:root{
+  --bur:#3c0d1a; --bur2:#5a1a2b; --blush:#F7CACB; --blush2:#fbe4e4;
+  --brown:#8a5a4a; --sand:#f3e6dc; --cream:#fffaf6;
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:Georgia,"Times New Roman",serif;background:var(--cream);color:var(--bur);padding:18px}
+.wrap{max-width:900px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+h1{font-size:22px;letter-spacing:.04em;font-weight:600}
+.sub{font-family:system-ui,sans-serif;font-size:12px;color:var(--brown)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.card{background:var(--blush2);border-radius:18px;padding:16px;text-align:center;
+  opacity:0;transform:translateY(14px);animation:in .7s ease forwards}
+.card:nth-child(2){animation-delay:.12s}.card:nth-child(3){animation-delay:.24s}
+.card:nth-child(4){animation-delay:.36s}.card:nth-child(5){animation-delay:.48s}
+.card:nth-child(6){animation-delay:.6s}
+@keyframes in{to{opacity:1;transform:none}}
+.label{font-family:system-ui,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--brown);margin-top:8px}
+.big{font-size:34px;font-weight:700;line-height:1}
+.small{font-family:system-ui,sans-serif;font-size:12px;color:var(--bur2);margin-top:4px}
+svg.ring{width:120px;height:120px;transform:rotate(-90deg)}
+.ring .bg{fill:none;stroke:#fff;stroke-width:12}
+.ring .fg{fill:none;stroke:var(--bur);stroke-width:12;stroke-linecap:round;
+  stroke-dasharray:314;stroke-dashoffset:314;transition:stroke-dashoffset 1.6s cubic-bezier(.2,.8,.2,1)}
+.ringbox{position:relative;width:120px;height:120px;margin:0 auto}
+.ringbox .big{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px}
+.dots{display:flex;gap:6px;justify-content:center;margin:12px 0 4px;flex-wrap:wrap}
+.dot{width:20px;height:20px;border-radius:50%;background:#fff;transform:scale(.3);opacity:0;
+  transition:transform .5s cubic-bezier(.3,1.6,.5,1),opacity .4s,background .4s}
+.dot.on{background:var(--bur);transform:scale(1);opacity:1}
+.dot.off{transform:scale(1);opacity:1}
+.bar{height:16px;background:#fff;border-radius:10px;overflow:hidden;margin:16px 0 6px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brown),var(--bur));
+  border-radius:10px;transition:width 1.6s cubic-bezier(.2,.8,.2,1)}
+.stars{display:flex;gap:4px;justify-content:center;margin:14px 0 4px}
+.star{width:26px;height:26px;opacity:.25;transform:scale(.6);transition:all .5s cubic-bezier(.3,1.6,.5,1)}
+.star.on{opacity:1;transform:scale(1)}
+.star path{fill:var(--bur)}
+.msg{margin-top:16px;background:var(--bur);color:var(--blush);border-radius:18px;padding:16px 20px;font-size:16px;text-align:center;
+  opacity:0;animation:in .8s ease 1s forwards}
+.empty{text-align:center;padding:50px 10px;font-family:system-ui,sans-serif;color:var(--brown)}
+@media (prefers-reduced-motion:reduce){
+  .card,.msg{animation-duration:.01s;animation-delay:0s!important}
+  .ring .fg,.bar i,.dot,.star{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+(function(){
+  var q = new URLSearchParams(location.search);
+  function num(k){
+    var v = q.get(k); if(v===null||v==='') return null;
+    v = parseFloat(String(v).replace(/\s/g,'').replace(',','.'));
+    return isNaN(v) ? null : v;
+  }
+  var d = {
+    vanor:num('vanor'), loggade:num('loggade'), pass:num('pass'), min:num('min'),
+    somn:num('somn'), somndagar:num('somndagar'), uppg:num('uppg'), uppgtot:num('uppgtot'),
+    energi:num('energi'), energin:num('energin'), dagar:num('dagar')
+  };
+  var app = document.getElementById('app');
+  var anyData = Object.keys(d).some(function(k){return d[k]!==null;});
+  if(!anyData){
+    app.innerHTML = '<div class="empty">Veckans puls väntar på siffror.<br>Öppna den via länken på veckosidan.</div>';
+    return;
+  }
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function pct(a,b){ return (b&&b>0&&a!==null) ? Math.max(0,Math.min(1,a/b)) : 0; }
+  function fmt(n,dec){ return (Math.round(n*Math.pow(10,dec||0))/Math.pow(10,dec||0)).toString().replace('.',','); }
+
+  var habitPct = pct(d.vanor,d.loggade), taskPct = pct(d.uppg,d.uppgtot);
+  var sleepAvg = (d.somn!==null && d.somndagar>0) ? d.somn/d.somndagar : null; // sömnkvalitet 0–100
+  var enN = (d.energin!==null && d.energin>0) ? d.energin : d.somndagar; // samma daglig incheckning som sömn
+  var energyAvg = (d.energi!==null && enN>0) ? d.energi/enN : null; // energi (Body Battery) 0–100
+  var minBar = Math.min(1,(d.min||0)/300); // visuellt mål: 300 min/vecka
+
+  var starPath='M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7z';
+  var stars=''; for(var i=0;i<5;i++) stars+='<svg class="star" viewBox="0 0 24 24"><path d="'+starPath+'"/></svg>';
+  var passDots=''; var np=Math.min(Math.round(d.pass||0),14);
+  for(var j=0;j<Math.max(np,1);j++) passDots+='<span class="dot'+(np===0?' off':'')+'"></span>';
+
+  app.innerHTML =
+   '<header><h1>Veckans puls</h1><span class="sub">'+(d.dagar!==null?fmt(d.dagar)+' incheckningar':'')+'</span></header>'+
+   '<div class="grid">'+
+    card('<div class="ringbox"><svg class="ring" viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="50"/><circle class="fg" id="r1" cx="60" cy="60" r="50"/></svg><div class="big" id="n1">0%</div></div>','Vanor','<span id="s1"></span>')+
+    card('<div class="dots" id="dots">'+passDots+'</div><div class="big" id="n2">0</div>','Träningspass','<span id="s2"></span>')+
+    card('<div class="ringbox"><svg class="ring" viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="50"/><circle class="fg" id="r3" cx="60" cy="60" r="50" style="stroke:var(--brown)"/></svg><div class="big" id="n3">0%</div></div>','Uppgifter','<span id="s3"></span>')+
+    card('<div class="big" id="n4">–</div><div class="bar"><i id="b4"></i></div>','Sömnkvalitet','<span id="s4"></span>')+
+    card('<div class="stars" id="stars">'+stars+'</div><div class="big" id="n5">–</div>','Energi (Body Battery)','<span id="s5"></span>')+
+   '</div>'+
+   '<div class="msg" id="msg"></div>';
+
+  function card(inner,label,small){ return '<div class="card">'+inner+'<div class="label">'+label+'</div><div class="small">'+small+'</div></div>'; }
+  function $(id){return document.getElementById(id);}
+  function count(el,to,dec,suffix,dur){
+    if(reduce){ el.textContent=fmt(to,dec)+(suffix||''); return; }
+    var t0=null;
+    function step(t){ if(!t0)t0=t; var p=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-p,3);
+      el.textContent=fmt(to*e,dec)+(suffix||''); if(p<1) requestAnimationFrame(step); }
+    requestAnimationFrame(step);
+  }
+
+  setTimeout(function(){
+    // Vanor
+    $('r1').style.strokeDashoffset = 314*(1-habitPct);
+    count($('n1'),habitPct*100,0,'%',1500);
+    $('s1').textContent = d.vanor!==null ? fmt(d.vanor)+' av '+fmt(d.loggade||0)+' klara' : 'Ingen data';
+    // Pass
+    count($('n2'),d.pass||0,0,'',1200);
+    var ds=document.querySelectorAll('#dots .dot');
+    ds.forEach(function(el,i){ setTimeout(function(){el.classList.add('on');}, reduce?0:200+i*110); });
+    $('s2').textContent = d.min!==null ? fmt(d.min)+' minuter' : '';
+    // Uppgifter
+    $('r3').style.strokeDashoffset = 314*(1-taskPct);
+    if(d.uppgtot){ count($('n3'),taskPct*100,0,'%',1500); } else { $('n3').textContent='–'; }
+    $('s3').textContent = d.uppgtot ? fmt(d.uppg||0)+' av '+fmt(d.uppgtot)+' klara' : 'Inga uppgifter';
+    // Sömn
+    if(sleepAvg!==null){ count($('n4'),sleepAvg,0,' / 100',1400); $('b4').style.width=Math.max(0,Math.min(100,sleepAvg))+'%'; $('s4').textContent='Snitt över '+fmt(d.somndagar)+(d.somndagar===1?' natt':' nätter'); }
+    else $('s4').textContent='Ingen data';
+    // Energi
+    if(energyAvg!==null){
+      count($('n5'),energyAvg,0,' / 100',1300);
+      var on=Math.max(0,Math.min(5,Math.round(energyAvg/20)));
+      document.querySelectorAll('#stars .star').forEach(function(el,i){ if(i<on) setTimeout(function(){el.classList.add('on');}, reduce?0:300+i*180); });
+      $('s5').textContent='Snitt över '+fmt(enN)+(enN===1?' mätning':' mätningar');
+    } else $('s5').textContent='Ingen data';
+    // Hälsning
+    var m;
+    if(habitPct>=.8 && (d.pass||0)>=2) m='Stark vecka! Vanorna satt och kroppen fick röra på sig.';
+    else if(habitPct>=.5 || taskPct>=.6) m='Bra rytm den här veckan. Du gjorde mer än du kanske tror.';
+    else if(d.dagar>0) m='En lugnare vecka. Titta på vad som fungerade och ta med det vidare.';
+    else m='Fyll i veckans dagar så får du din puls här.';
+    $('msg').textContent=m;
+  }, reduce?0:350);
+})();
+</script>
+</body>
+</html>
